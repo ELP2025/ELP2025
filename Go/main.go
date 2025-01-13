@@ -41,7 +41,7 @@ const (
 	` + "\x00"
 
 	fps = 60
-  threshold = 0.01
+  threshold = 0.15
 )
 
 var (
@@ -81,9 +81,9 @@ func main() {
 		t := time.Now()
 
 		// Dynamically update pixel data (optional)
-		nestedPixels = generateNestedPixels() // Regenerate pixel data
 		flatPixels = flattenPixels(nestedPixels)
 		updateTexture(texture, flatPixels)
+    fmt.Println(countNeighbors(nestedPixels,1000,1000))
 
 		// Render
 		draw(window, program, vao, texture)
@@ -224,16 +224,51 @@ func generateNestedPixels() [][][]uint8 {
 		for x := range nestedPixels[y] {
 			if rand.Float32() < threshold { 
 				nestedPixels[y][x] = []uint8{
-					uint8(rand.Intn(256)), // R
-					uint8(rand.Intn(256)), // G
-					uint8(rand.Intn(256)), // B
+					uint8(255), // R
+					uint8(255), // G
+					uint8(255), // B
 				}
 			} else {
 				nestedPixels[y][x] = []uint8{0, 0, 0} // Default to black
-			}
+      }
 		}
 	}
+  nestedPixels[101][100] = []uint8{255,255,255}
 	return nestedPixels
+}
+
+func checkNeighbors(pixels [][][]uint8, x int, y int) int { 
+    if x + 1 > width {
+      x = 0
+    } else if x-1 < 0 {
+      x = width - 1
+    }
+    if y + 1 > height {
+      y = 0
+    } else if y-1 < 0 {
+      y = height - 1
+    }
+    if pixels[y][x][0] == 255 {
+      return 1 
+    } else {
+      return 0
+    }
+  }
+
+func countNeighbors(pixels [][][]uint8, x int, y int) int {
+  neighbors_count := 0 
+
+
+  neighbors_count += checkNeighbors(pixels, x-1, y-1)
+  neighbors_count += checkNeighbors(pixels, x, y-1)
+  neighbors_count += checkNeighbors(pixels, x+1, y-1)
+  neighbors_count += checkNeighbors(pixels, x-1, y)
+  neighbors_count += checkNeighbors(pixels, x+1, y)
+  neighbors_count += checkNeighbors(pixels, x-1, y+1)
+  neighbors_count += checkNeighbors(pixels, x, y+1)
+  neighbors_count += checkNeighbors(pixels, x+1, y+1)
+
+  return neighbors_count
 }
 
 // Converti un tableau 3D en une liste 1D utilisable  par OpenGL pour générer la texture
