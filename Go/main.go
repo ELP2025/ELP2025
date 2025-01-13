@@ -15,6 +15,8 @@ const (
 	width  = 1000
 	height = 1000
 
+  //threads = 12
+
 	vertexShaderSource = `
 		#version 410
 		layout(location = 0) in vec3 position; // Vertex position
@@ -41,7 +43,7 @@ const (
 	` + "\x00"
 
 	fps = 60
-  threshold = 0.15
+  threshold = 0.1
 )
 
 var (
@@ -280,20 +282,37 @@ func countNeighbors(pixels [][][]uint8, x int, y int) int {
   return neighbors_count
 }
 
-func update(pixels [][][]uint8) [][][]uint8{
-  newPixels := make([][][]uint8, height)
-	for y := range newPixels {
-		newPixels[y] = make([][]uint8, width)
-		for x := range newPixels[y] {
+func updateLine(pixels [][][]uint8, y int) [][]uint8 {
+  newPixels := make([][]uint8, width)
+  
+		for x := range newPixels {
       neigh := countNeighbors(pixels, x, y)
 				if neigh < 2 || neigh > 3 {
-          newPixels[y][x] = []uint8{0, 0, 0}
+          newPixels[x] = []uint8{0, 0, 0}
         } else if neigh == 2 {
-          newPixels[y][x] = pixels[y][x]
+          newPixels[x] = pixels[y][x]
         } else {
-          newPixels[y][x] = []uint8{255, 255, 255}
+          newPixels[x] = []uint8{255, 255, 255}
         }
-	  }
   }
+  return newPixels
+}
+
+func update(pixels [][][]uint8) [][][]uint8{
+  newPixels := make([][][]uint8, height)
+  done := make(chan int, height) // Channel to synchronize goroutines
+
+    for i := 0; i < height; i++ {
+        i := i // Capture the loop variable
+        go func() {
+            newPixels[i] = updateLine(pixels, i)
+            done <- i // Signal completion
+        }()
+    }
+
+    // Wait for all goroutines to finish
+    for i := 0; i < height; i++ {
+        <-done
+    }
   return newPixels
 }
