@@ -81,9 +81,9 @@ func main() {
 		t := time.Now()
 
 		// Dynamically update pixel data (optional)
+    nestedPixels = update(nestedPixels)
 		flatPixels = flattenPixels(nestedPixels)
 		updateTexture(texture, flatPixels)
-    fmt.Println(countNeighbors(nestedPixels,1000,1000))
 
 		// Render
 		draw(window, program, vao, texture)
@@ -216,6 +216,17 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 	return shader, nil
 }
 
+// Converti un tableau 3D en une liste 1D utilisable  par OpenGL pour générer la texture
+func flattenPixels(nestedPixels [][][]uint8) []uint8 {
+	flat := make([]uint8, 0, width*height*3)
+	for _, row := range nestedPixels {
+		for _, pixel := range row {
+			flat = append(flat, pixel[0], pixel[1], pixel[2])
+		}
+	}
+	return flat
+}
+
 // genere des pixels avec une couleur random
 func generateNestedPixels() [][][]uint8 {
 	nestedPixels := make([][][]uint8, height)
@@ -233,7 +244,6 @@ func generateNestedPixels() [][][]uint8 {
       }
 		}
 	}
-  nestedPixels[101][100] = []uint8{255,255,255}
 	return nestedPixels
 }
 
@@ -258,7 +268,6 @@ func checkNeighbors(pixels [][][]uint8, x int, y int) int {
 func countNeighbors(pixels [][][]uint8, x int, y int) int {
   neighbors_count := 0 
 
-
   neighbors_count += checkNeighbors(pixels, x-1, y-1)
   neighbors_count += checkNeighbors(pixels, x, y-1)
   neighbors_count += checkNeighbors(pixels, x+1, y-1)
@@ -271,14 +280,20 @@ func countNeighbors(pixels [][][]uint8, x int, y int) int {
   return neighbors_count
 }
 
-// Converti un tableau 3D en une liste 1D utilisable  par OpenGL pour générer la texture
-func flattenPixels(nestedPixels [][][]uint8) []uint8 {
-	flat := make([]uint8, 0, width*height*3)
-	for _, row := range nestedPixels {
-		for _, pixel := range row {
-			flat = append(flat, pixel[0], pixel[1], pixel[2])
-		}
-	}
-	return flat
+func update(pixels [][][]uint8) [][][]uint8{
+  newPixels := make([][][]uint8, height)
+	for y := range newPixels {
+		newPixels[y] = make([][]uint8, width)
+		for x := range newPixels[y] {
+      neigh := countNeighbors(pixels, x, y)
+				if neigh < 2 || neigh > 3 {
+          newPixels[y][x] = []uint8{0, 0, 0}
+        } else if neigh == 2 {
+          newPixels[y][x] = pixels[y][x]
+        } else {
+          newPixels[y][x] = []uint8{255, 255, 255}
+        }
+	  }
+  }
+  return newPixels
 }
-
