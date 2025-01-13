@@ -1,2 +1,2 @@
 # ELP2025
-Eglise Lutin Procrastinateur
+Eglise des Lutins Procrastinateur
