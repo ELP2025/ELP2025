@@ -8,6 +8,11 @@ import (
 var (
 	width  = 1000
 	height = 1000
+  r1 = 1 
+  r2 = 10 
+  B = 0.3
+  S = 0.7
+  K = 1
 )
 
 func circleKernel(radius float64, center_x int, center_y int) []struct {
@@ -70,7 +75,7 @@ func GenerateRandomPixels(grid_width int, grid_height int) [][][]uint8 {
 	for y := range nestedPixels {
 		nestedPixels[y] = make([][]uint8, width)
 		for x := range nestedPixels[y] {
-			aliveness := rand.Float32() / 2
+			aliveness := rand.Float32()
 			nestedPixels[y][x] = []uint8{
 				uint8(255 * aliveness), // R
 				uint8(255 * aliveness), // G
@@ -100,8 +105,9 @@ func compute_new_state(S_n float64, S_m float64, B float64, S float64, K float64
 func updateLine(pixels [][][]uint8, y int) [][]uint8 {
 	newPixels := make([][]uint8, width)
 	for x := range newPixels {
-		S_n, S_m, B, S, K := func_gabi()
-		new_color := compute_new_state(S_n, S_m, B, S, K)
+    S_n := wheightedConvolve(pixels, r1, x, y)
+    S_m := wheightedConvolve(pixels, r2, x, y)
+    new_color := compute_new_state(S_n, S_m, B, S, K)
 		newPixels[x] = []uint8{new_color, new_color, new_color}
 	}
 	return newPixels

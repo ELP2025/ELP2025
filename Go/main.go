@@ -33,6 +33,7 @@ func main() {
 
 		// Dynamically update pixel data (optional)
     //nestedPixels = game_of_life.UpdateGrid(nestedPixels)
+    nestedPixels = smoothlife.UpdateGrid(nestedPixels)
 		opengl_utils.UpdateTexture(nestedPixels)
 
 
