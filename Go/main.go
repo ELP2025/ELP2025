@@ -31,10 +31,10 @@ func main() {
 	for !window.ShouldClose() {
 		t := time.Now()
 
+		opengl_utils.UpdateTexture(nestedPixels)
 		// Dynamically update pixel data (optional)
 		//nestedPixels = game_of_life.UpdateGrid(nestedPixels)
 		nestedPixels = smoothlife.UpdateGrid(nestedPixels)
-		opengl_utils.UpdateTexture(nestedPixels)
 
 		time.Sleep(time.Second/time.Duration(fps) - time.Since(t))
 	}
