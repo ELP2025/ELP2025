@@ -29,6 +29,6 @@ func GenerateRandomPixels(grid_width int, grid_height int) [][][]uint8 {
 	return nestedPixels
 }
 
-func sigmoid(x, threshold, steepness) {
+func sigmoid(x float32, threshold float32, steepness float32) float32 {
 	return 1 / (1 + math.Exp(-steepness*(x-threshold)))
 }
