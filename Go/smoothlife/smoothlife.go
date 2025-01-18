@@ -8,48 +8,35 @@ import (
 var (
 	width  = 1000
 	height = 1000
-	r1     = 4.0
-	r2     = 15.0
+	r1     = 4
+	r2     = 15
 	B      = 0.3
 	S      = 0.3
 	K      = 0.5
+  smallKernel = circleKernel(r1)
+  bigKernel = circleKernel(r2)
 )
 
-func circleKernel(radius float64, center_x int, center_y int) []struct {
-	Y int
-	X int
-} {
-	result := []struct {
-		Y int
-		X int
-	}{}
-	for x := float64(center_x) - radius; x <= float64(center_x)+radius; x++ { //Reducing the interval for our search
-		for y := float64(center_y) - radius; y <= float64(center_y)+radius; y++ { //Same
-			if math.Sqrt((x-float64(center_x))*(x-float64(center_x))+(y-float64(center_y))*(y-float64(center_y))) < radius { // If (x,y) is in circle of radius
-				result = append(result, struct {
-					Y int
-					X int
-				}{Y: int(y), X: int(x)})
+func circleKernel(radius int) []struct{Y int; X int} {
+	result := []struct {Y int; X int}{}
+	for x := - radius; x <= radius; x++ { //Reducing the interval for our search
+		for y := - radius; y <=radius; y++ { //Same
+			if math.Sqrt(float64((x*x)+(y*y))) <= float64(radius) { // If (x,y) is in circle of radius
+				result = append(result, struct {Y int; X int}{Y: int(y), X: int(x)})
 			}
 		}
 	}
 	return result
 }
 
-func wheightedConvolve(pixels [][][]uint8, radius float64, x int, y int) float64 {
-	points := circleKernel(radius, x, y)
+func wheightedConvolve(pixels [][][]uint8, kernel []struct{Y int; X int}, x int, y int) float64 {
 	sum := 0.0
-	count := 0
-	for _, point := range points {
-		px, py := point.X, point.Y
+	for _, point := range kernel {
+		px, py := point.X+x, point.Y+y
 		sum += float64(getNeighborValue(pixels, px, py)) / 255.0
-		count += 1
 	}
 
-	if count > 0 {
-		return (sum / float64(count))
-	}
-	return 0
+	return sum/float64(len(kernel))
 }
 
 func getNeighborValue(pixels [][][]uint8, x int, y int) uint8 {
@@ -68,19 +55,25 @@ func getNeighborValue(pixels [][][]uint8, x int, y int) uint8 {
 }
 
 // genere des pixels avec une couleur random
-func GenerateRandomPixels(grid_width int, grid_height int) [][][]uint8 {
-	width = grid_width
+func GenerateRandomPixels(grid_width int, grid_height int, smallKernelRadius int, bigKernelRaddius int, threshold float32) [][][]uint8 {
+	smallKernel = circleKernel(r1)
+  bigKernel = circleKernel(r2)
+  width = grid_width
 	height = grid_height
 	nestedPixels := make([][][]uint8, height)
 	for y := range nestedPixels {
 		nestedPixels[y] = make([][]uint8, width)
 		for x := range nestedPixels[y] {
-			aliveness := rand.Float32() / 4
-			nestedPixels[y][x] = []uint8{
-				uint8(255 * aliveness), // R
-				uint8(255 * aliveness), // G
-				uint8(255 * aliveness), // B
-			}
+      if rand.Float32() < threshold {
+			  aliveness := rand.Float32()
+			  nestedPixels[y][x] = []uint8{
+				  uint8(255 * aliveness), // R
+				  uint8(255 * aliveness), // G
+				  uint8(255 * aliveness), // B
+			  }
+      } else {
+        nestedPixels[y][x] = []uint8{0,0,0}
+      }
 		}
 	}
 
@@ -94,9 +87,10 @@ func sigmoid(x float64, threshold float64, steepness float64) float64 {
 func compute_new_state(S_n float64, S_m float64, B float64, S float64, K float64) uint8 {
 	birth := sigmoid(S_m, B, K)
 	survival := sigmoid(S_m, S, K)
+  //fmt.Printf("Birth rate : %f Survival rate : %f\n", birth, survival)
 
 	calcul_float := S_n*birth + (1-S_n)*survival
-	val_couleur := calcul_float * 255
+  val_couleur := calcul_float * 255
 	roundedUp := math.Ceil(val_couleur)
 	intNumber := uint8(roundedUp)
 	return intNumber
@@ -105,8 +99,8 @@ func compute_new_state(S_n float64, S_m float64, B float64, S float64, K float64
 func updateLine(pixels [][][]uint8, y int) [][]uint8 {
 	newPixels := make([][]uint8, width)
 	for x := range newPixels {
-		S_n := wheightedConvolve(pixels, r1, x, y)
-		S_m := wheightedConvolve(pixels, r2, x, y)
+		S_n := wheightedConvolve(pixels, smallKernel, x, y)
+		S_m := wheightedConvolve(pixels, bigKernel, x, y)
 		new_color := compute_new_state(S_n, S_m, B, S, K)
 		newPixels[x] = []uint8{new_color, new_color, new_color}
 	}

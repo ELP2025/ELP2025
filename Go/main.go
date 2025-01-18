@@ -16,7 +16,7 @@ const (
 	height = 1000
 	fps    = 60
 
-	//threshold = 0.3
+	threshold = 0.05
 )
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 	defer glfw.Terminate() //Making sure we kill our window properly
 
 	//nestedPixels := game_of_life.GenerateRandomPixels(width, height,threshold)
-	nestedPixels := smoothlife.GenerateRandomPixels(width, height)
+	nestedPixels := smoothlife.GenerateRandomPixels(width, height, 4, 16, threshold)
 
 	for !window.ShouldClose() {
 		t := time.Now()
