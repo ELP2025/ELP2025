@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
   "sync"
+  "runtime"
 )
 
 var (
@@ -18,6 +19,9 @@ var (
 	b2 float64 = 0.365
 	d1 float64 = 0.267
 	d2 float64 = 0.445
+
+  raWheights []float64
+  rbWheights []float64
 )
 
 func modulo(a, b int) int {
@@ -52,25 +56,42 @@ func s(n, m, b1, b2, d1, d2 float64) float64 {
 }
 
 func innerKernel(world [][]float64, x, y, radius int) float64{
-  return convolve(world, x, y, radius, true)
+  return convolve(world, x, y, radius, rbWheights,true)
 }
 
 func outerKernel(world [][]float64, x, y, radius int) float64 {
-  return convolve(world, x, y, radius, false)
+  return convolve(world, x, y, radius, raWheights, false)
 }
 
-func convolve(world [][]float64, x, y, radius int, noCenter bool) float64 {
+func precomputeWeights(radius float64) []float64 {
+	size := int((2*radius + 1) * (2*radius + 1))
+	weights := make([]float64, size)
+
+	index := 0
+	for dy := -radius; dy <= radius; dy++ {
+		for dx := -radius; dx <= radius; dx++ {
+			dist := math.Sqrt(float64(dx*dx + dy*dy))
+			weights[index] = math.Exp(-0.5 * math.Pow(dist/float64(radius), 2))
+			index++
+		}
+	}
+
+	return weights
+}
+
+func convolve(world [][]float64, x, y, radius int, wheights []float64, noCenter bool) float64 {
 	sum := 0.0
-  total := 0.0 
+  total := 0.0
+  index := 0
+
   for i := modulo(y, height) - radius; i <= modulo(y, height) + radius; i++ {
     for j:= modulo(x, width) - radius; j <= modulo(x, width) + radius; j++ {
-      if !(noCenter && y == i && x == j) {
-      dist := math.Sqrt(float64(i-y)*float64(i-y) + float64(j-x)*float64(j-x))
-      wheight := math.Exp(-0.5 * math.Pow(dist/float64(radius), 2))
-
-      sum += wheight * world[modulo(i, width)][modulo(j, height)]
-      total += wheight
-    }
+      if (noCenter && y == i && x == j) {continue}
+      
+      sum += wheights[index] * world[modulo(i, width)][modulo(j, height)]
+      total += wheights[index]
+      
+      index ++
     }
   }
   
@@ -108,7 +129,8 @@ func GenerateRandomPixels(grid_width, grid_height int, kernelRadius float64, thr
       }
 		}
 	}
-
+  raWheights = precomputeWeights(ra)
+  rbWheights = precomputeWeights(ra/3)
 	return nestedPixels, world1, world2, world3
 }
 
@@ -137,17 +159,11 @@ func updateLine(world1, world2, world3 [][]float64, pixels []uint8, newWorld1, n
 func UpdateGrid(pixels []uint8, world1, world2, world3 [][]float64) ([]uint8, [][]float64, [][]float64, [][]float64) {
 	var wg sync.WaitGroup
 
-  newWorld1 := make([][]float64, height)
-  newWorld2 := make([][]float64, height)
-  newWorld3 := make([][]float64, height)
+  newWorld1 := world1
+  newWorld2 := world2 
+  newWorld3 := world3
 
-  for i := 0; i < height; i++ {
-		newWorld1[i] = make([]float64, width)
-		newWorld2[i] = make([]float64, width)
-		newWorld3[i] = make([]float64, width)
-	}
-
-  thread := 11
+  thread := runtime.NumCPU()*2
   linesPerThread := height/thread
 
 	for i := 0; i < thread; i++ {
