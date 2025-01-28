@@ -6,70 +6,95 @@ import (
 )
 
 var (
-	width  = 1000
-	height = 1000
-	r1     = 4
-	r2     = 15
-	B      = 0.3
-	S      = 0.3
-	K      = 0.5
-  smallKernel = circleKernel(r1)
-  bigKernel = circleKernel(r2)
+  width = 1000
+  height = 1000
+
+  ra    float64 = 11
+	alpha float64 = 0.028
+	dt    float64 = 0.05
+
+	b1 float64 = 0.278
+	b2 float64 = 0.365
+	d1 float64 = 0.267
+	d2 float64 = 0.445
 )
 
-func circleKernel(radius int) []struct{Y int; X int} {
-	result := []struct {Y int; X int}{}
-	for x := - radius; x <= radius; x++ { //Reducing the interval for our search
-		for y := - radius; y <=radius; y++ { //Same
-			if math.Sqrt(float64((x*x)+(y*y))) <= float64(radius) { // If (x,y) is in circle of radius
-				result = append(result, struct {Y int; X int}{Y: int(y), X: int(x)})
-			}
-		}
-	}
-	return result
+func modulo(a, b int) int {
+  // Used to wrap values arround the grid
+  return (a%b + b) % b
 }
 
-func wheightedConvolve(pixels [][][]uint8, kernel []struct{Y int; X int}, x int, y int) float64 {
+func clamp(x, min, max float64) float64 {
+  // Make sure our values are not out of bound
+  if x > max { 
+    return max
+  } else if x < min {
+    return min
+  }
+  return x
+}
+
+func sigma1(x, a float64) float64 {
+	return 1.0 / (1.0 + math.Exp(-(x-a)*4/alpha))
+}
+
+func sigma2(x, a, b float64) float64 {
+	return sigma1(x, a) * (1 - sigma1(x, b))
+}
+
+func sigmam(x, y, m float64) float64 {
+	return x*(1-sigma1(m, 0.5)) + y*sigma1(m, 0.5)
+}
+
+func s(n, m, b1, b2, d1, d2 float64) float64 {
+	return sigma2(n, sigmam(b1, d1, m), sigmam(b2, d2, m))
+}
+
+func innerKernel(world [][]float64, x, y, radius int) float64{
+  return convolve(world, x, y, radius, true)
+}
+
+func outerKernel(world [][]float64, x, y, radius int) float64 {
+  return convolve(world, x, y, radius, false)
+}
+
+func convolve(world [][]float64, x, y, radius int, noCenter bool) float64 {
 	sum := 0.0
-	for _, point := range kernel {
-		px, py := point.X+x, point.Y+y
-		sum += float64(getNeighborValue(pixels, px, py)) / 255.0
-	}
+  total := 0.0 
+  for i := modulo(y, height) - radius; i <= modulo(y, height) + radius; i++ {
+    for j:= modulo(x, width) - radius; j <= modulo(x, width) + radius; j++ {
+      if !(noCenter && y == i && x == j) {
+      dist := math.Sqrt(float64(i-y)*float64(i-y) + float64(j-x)*float64(j-x))
+      wheight := math.Exp(-0.5 * math.Pow(dist/float64(radius), 2))
 
-	return sum/float64(len(kernel))
-}
-
-func getNeighborValue(pixels [][][]uint8, x int, y int) uint8 {
-	//Returns the value of the selected pixel, if it overflows, it goes back to the start of the grid
-	if x >= width {
-		x -= width
-	} else if x < 0 {
-		x += width
-	}
-	if y >= height {
-		y -= height
-	} else if y < 0 {
-		y += height
-	}
-	return pixels[y][x][0]
+      sum += wheight * world[modulo(i, width)][modulo(j, height)]
+      total += wheight
+    }
+    }
+  }
+  
+  if total != 0 {
+    return (sum / total)
+  }
+  return 0.0
 }
 
 // genere des pixels avec une couleur random
-func GenerateRandomPixels(grid_width int, grid_height int, smallKernelRadius int, bigKernelRaddius int, threshold float32) [][][]uint8 {
-	smallKernel = circleKernel(r1)
-  bigKernel = circleKernel(r2)
+func GenerateRandomPixels(grid_width, grid_height, kernelRadius int, threshold float32) ([][][]uint8, [][]float64) {
   width = grid_width
 	height = grid_height
+  world := make([][]float64, height)
 	nestedPixels := make([][][]uint8, height)
 	for y := range nestedPixels {
+    world[y] = make([]float64, width)
 		nestedPixels[y] = make([][]uint8, width)
 		for x := range nestedPixels[y] {
       if rand.Float32() < threshold {
-			  aliveness := rand.Float32()
+        world[y][x] = rand.Float64()
 			  nestedPixels[y][x] = []uint8{
-				  uint8(255 * aliveness), // R
-				  uint8(255 * aliveness), // G
-				  uint8(255 * aliveness), // B
+				  uint8(255 * world[y][x]), // R
+				  uint8(255 * world[y][x]), // G
+				  uint8(255 * world[y][x]), // B
 			  }
       } else {
         nestedPixels[y][x] = []uint8{0,0,0}
@@ -77,44 +102,28 @@ func GenerateRandomPixels(grid_width int, grid_height int, smallKernelRadius int
 		}
 	}
 
-	return nestedPixels
+	return nestedPixels, world
 }
 
-func sigmoid(x float64, threshold float64, steepness float64) float64 {
-	return 1 / (1 + math.Exp(-steepness*(x-threshold)))
-}
-
-func compute_new_state(S_n float64, S_m float64, B float64, S float64, K float64) uint8 {
-	birth := sigmoid(S_m, B, K)
-	survival := sigmoid(S_m, S, K)
-  //fmt.Printf("Birth rate : %f Survival rate : %f\n", birth, survival)
-
-	calcul_float := S_n*birth + (1-S_n)*survival
-  val_couleur := calcul_float * 255
-	roundedUp := math.Ceil(val_couleur)
-	intNumber := uint8(roundedUp)
-	return intNumber
-}
-
-func updateLine(pixels [][][]uint8, y int) [][]uint8 {
-	newPixels := make([][]uint8, width)
-	for x := range newPixels {
-		S_n := wheightedConvolve(pixels, smallKernel, x, y)
-		S_m := wheightedConvolve(pixels, bigKernel, x, y)
-		new_color := compute_new_state(S_n, S_m, B, S, K)
-		newPixels[x] = []uint8{new_color, new_color, new_color}
+func updateLine(world [][]float64, y int) []float64 {
+	newW := make([]float64, width)
+	for x := range newW {
+    outer := outerKernel(world, y, x,int(ra-1))
+    inner := innerKernel(world, y, x,int(ra-1)/3)
+    
+    newW[x] = 2*s(outer, inner, b1, b2, d1, d2) - 1
 	}
-	return newPixels
+	return newW
 }
 
-func UpdateGrid(pixels [][][]uint8) [][][]uint8 {
-	newPixels := make([][][]uint8, height)
+func UpdateGrid(pixels [][][]uint8, world [][]float64) ([][][]uint8, [][]float64) {
+	newWorld := make([][]float64, height)
 	done := make(chan int, height) // Channel to synchronize goroutines
 
 	for i := 0; i < height; i++ {
 		i := i // Capture the loop variable
 		go func() {
-			newPixels[i] = updateLine(pixels, i)
+			newWorld[i] = updateLine(world, i)
 			done <- i // Signal completion
 		}()
 	}
@@ -123,5 +132,14 @@ func UpdateGrid(pixels [][][]uint8) [][][]uint8 {
 	for i := 0; i < height; i++ {
 		<-done
 	}
-	return newPixels
+
+  for i:=range world {
+    for j := range world[i] {
+      world[i][j] += dt * newWorld[i][j]
+      world[i][j] = clamp(world[i][j], 0, 1)
+      pixels[i][j] = []uint8{uint8(255*world[i][j]), uint8(255*world[i][j]),uint8(255*world[i][j])}
+    }
+  }
+
+	return pixels, world
 }
