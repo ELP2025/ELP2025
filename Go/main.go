@@ -26,15 +26,15 @@ func main() {
 	defer glfw.Terminate() //Making sure we kill our window properly
 
 	//nestedPixels := game_of_life.GenerateRandomPixels(width, height,threshold)
-	nestedPixels, world := smoothlife.GenerateRandomPixels(width, height, 11, threshold)
+	pixels, world := smoothlife.GenerateRandomPixels(width, height, 11, threshold)
 
 	for !window.ShouldClose() {
     //t := time.Now()
 
-		opengl_utils.UpdateTexture(nestedPixels)
+		opengl_utils.UpdateTexture(pixels)
 		// Dynamically update pixel data (optional)
 		//nestedPixels = game_of_life.UpdateGrid(nestedPixels)
-		nestedPixels, world = smoothlife.UpdateGrid(nestedPixels, world)
+		pixels, world = smoothlife.UpdateGrid(pixels, world)
 
 		//time.Sleep(time.Second/time.Duration(fps) - time.Since(t))
 	}

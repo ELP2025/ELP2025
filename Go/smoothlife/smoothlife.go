@@ -80,24 +80,23 @@ func convolve(world [][]float64, x, y, radius int, noCenter bool) float64 {
 }
 
 // genere des pixels avec une couleur random
-func GenerateRandomPixels(grid_width, grid_height, kernelRadius int, threshold float32) ([][][]uint8, [][]float64) {
+func GenerateRandomPixels(grid_width, grid_height, kernelRadius int, threshold float32) ([]uint8, [][]float64) {
   width = grid_width
 	height = grid_height
   world := make([][]float64, height)
-	nestedPixels := make([][][]uint8, height)
-	for y := range nestedPixels {
+	nestedPixels := make([]uint8, height*width*3)
+  for y := range world {
     world[y] = make([]float64, width)
-		nestedPixels[y] = make([][]uint8, width)
-		for x := range nestedPixels[y] {
+		for x := range world[y] {
       if rand.Float32() < threshold {
         world[y][x] = rand.Float64()
-			  nestedPixels[y][x] = []uint8{
-				  uint8(255 * world[y][x]), // R
-				  uint8(255 * world[y][x]), // G
-				  uint8(255 * world[y][x]), // B
-			  }
+        for c := 0; c < 3; c++ {
+          nestedPixels[(y*height+x)*3+c] = uint8(255 * world[y][x])
+        }
       } else {
-        nestedPixels[y][x] = []uint8{0,0,0}
+        for c := 0; c < 3; c++ {
+          nestedPixels[(y*height+x)*3+c] = uint8(0)
+        } 
       }
 		}
 	}
@@ -116,7 +115,7 @@ func updateLine(world [][]float64, y int) []float64 {
 	return newW
 }
 
-func UpdateGrid(pixels [][][]uint8, world [][]float64) ([][][]uint8, [][]float64) {
+func UpdateGrid(pixels []uint8, world [][]float64) ([]uint8, [][]float64) {
 	newWorld := make([][]float64, height)
 	done := make(chan int, height) // Channel to synchronize goroutines
 
@@ -137,7 +136,9 @@ func UpdateGrid(pixels [][][]uint8, world [][]float64) ([][][]uint8, [][]float64
     for j := range world[i] {
       world[i][j] += dt * newWorld[i][j]
       world[i][j] = clamp(world[i][j], 0, 1)
-      pixels[i][j] = []uint8{uint8(255*world[i][j]), uint8(255*world[i][j]),uint8(255*world[i][j])}
+      for c :=0; c < 3; c++ {
+        pixels[(i*height+j)*3+c] = uint8(255*world[i][j])
+      }
     }
   }
 
