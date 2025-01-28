@@ -84,8 +84,8 @@ func convolve(world [][]float64, x, y, radius int, wheights []float64, noCenter 
   total := 0.0
   index := 0
 
-  for i := modulo(y, height) - radius; i <= modulo(y, height) + radius; i++ {
-    for j:= modulo(x, width) - radius; j <= modulo(x, width) + radius; j++ {
+  for i := y - radius; i <= y + radius; i++ {
+    for j:= x - radius; j <= x + radius; j++ {
       if (noCenter && y == i && x == j) {continue}
       
       sum += wheights[index] * world[modulo(i, width)][modulo(j, height)]

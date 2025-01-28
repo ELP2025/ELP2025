@@ -74,9 +74,8 @@ func InitWindow(window_width int, window_height int) *glfw.Window {
 }
 
 func UpdateTexture(pixels []uint8) {
-  flatPixels := flattenPixels(pixels)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
-	gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, int32(width), int32(height), gl.RGB, gl.UNSIGNED_BYTE, gl.Ptr(flatPixels))
+	gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, int32(width), int32(height), gl.RGB, gl.UNSIGNED_BYTE, gl.Ptr(pixels))
   draw(window, program, vao, texture)
 }
 
@@ -199,19 +198,3 @@ func compileShader(source string, shaderType uint32) (uint32, error) {
 	return shader, nil
 }
 
-// Converti un tableau 3D en une liste 1D utilisable  par OpenGL pour générer la texture
-func flattenPixels(nestedPixels []uint8) []uint8 {
-  return nestedPixels
-  /*flat := make([]uint8, 0, width*height*3)
-  for _, pixel := range nestedPixels {
-    flat = append(flat, pixel[0], pixel[1], pixel[2])
-  }
-  return flat*/
-  //flat := make([]uint8, 0, width*height*3)
-	//for _, row := range nestedPixels {
-	//	for _, pixel := range row {
-	//		flat = append(flat, pixel[0], pixel[1], pixel[2])
-	//	}
-	//}
-	//return flat
-}
