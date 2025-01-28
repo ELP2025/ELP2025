@@ -112,52 +112,60 @@ func GenerateRandomPixels(grid_width, grid_height int, kernelRadius float64, thr
 	return nestedPixels, world1, world2, world3
 }
 
-func updateLine(world [][]float64, y int, buffer []float64) {
-	for x := range buffer {
-		outer := outerKernel(world, x, y, int(ra-1))
-		inner := innerKernel(world, x, y, int(ra-1)/3)
-		buffer[x] = 2*s(outer, inner, b1, b2, d1, d2) - 1
-	}
+func updateLine(world1, world2, world3 [][]float64, pixels []uint8, newWorld1, newWorld2, newWorld3 [][]float64, startLine, endLine int) {
+  for y:= startLine; y<endLine; y++ {
+    for x:=0; x < width; x++ {	
+      outer := outerKernel(world1, x, y, int(ra-1))
+		  inner := innerKernel(world1, x, y, int(ra-1)/3)
+		  newWorld1[y][x] = clamp(world1[y][x] + dt*(2*s(outer, inner, b1, b2, d1, d2) - 1), 0, 1)
+    
+      outer = outerKernel(world2, x, y, int(ra-1))
+		  inner = innerKernel(world2, x, y, int(ra-1)/3)
+		  newWorld2[y][x] = clamp(world2[y][x] + dt*(2*s(outer, inner, b1, b2, d1, d2) - 1), 0, 1)
+		
+      outer = outerKernel(world3, x, y, int(ra-1))
+		  inner = innerKernel(world3, x, y, int(ra-1)/3)
+		  newWorld3[y][x] = clamp(world3[y][x] + dt*(2*s(outer, inner, b1, b2, d1, d2) - 1),0, 1)
+  
+      pixels[(y*height+x)*3] = uint8(255 * world1[y][x])
+      pixels[(y*height+x)*3+1] = uint8(255 * world2[y][x])
+      pixels[(y*height+x)*3+2] = uint8(255 * world3[y][x])
+    }
+  }
 }
 
 func UpdateGrid(pixels []uint8, world1, world2, world3 [][]float64) ([]uint8, [][]float64, [][]float64, [][]float64) {
-	newWorld1 := make([][]float64, height)
-	newWorld2 := make([][]float64, height)
-	newWorld3 := make([][]float64, height)
 	var wg sync.WaitGroup
 
-	for i := 0; i < height; i++ {
-		wg.Add(1)
-		go func(y int) {
+  newWorld1 := make([][]float64, height)
+  newWorld2 := make([][]float64, height)
+  newWorld3 := make([][]float64, height)
+
+  for i := 0; i < height; i++ {
+		newWorld1[i] = make([]float64, width)
+		newWorld2[i] = make([]float64, width)
+		newWorld3[i] = make([]float64, width)
+	}
+
+  thread := 11
+  linesPerThread := height/thread
+
+	for i := 0; i < thread; i++ {
+    startLine := i* linesPerThread
+    endLine := startLine + linesPerThread
+		
+    if i == thread-1 {
+      endLine = height
+    }
+
+    wg.Add(1)
+		go func(startLine, endLine int) {
 			defer wg.Done()
-			buffer1 := make([]float64, width)
-			updateLine(world1, y, buffer1)
-			newWorld1[y] = buffer1
-      buffer2 := make([]float64, width)
-			updateLine(world2, y, buffer2)
-			newWorld2[y] = buffer2
-      buffer3 := make([]float64, width)
-			updateLine(world3, y, buffer3)
-			newWorld3[y] = buffer3
-		}(i)
+      updateLine(world1, world2, world3, pixels, newWorld1, newWorld2, newWorld3, startLine, endLine)
+		}(startLine, endLine)
 	}
 
 	wg.Wait()
 
-	for i := range world1 {
-		for j := range world1[i] {
-			world1[i][j] += dt * newWorld1[i][j]
-			world1[i][j] = clamp(world1[i][j], 0, 1)
-			pixels[(i*height+j)*3] = uint8(255 * world1[i][j])
-      world2[i][j] += dt * newWorld2[i][j]
-			world2[i][j] = clamp(world2[i][j], 0, 1)
-			pixels[(i*height+j)*3+1] = uint8(255 * world2[i][j])
-      world3[i][j] += dt * newWorld3[i][j]
-			world3[i][j] = clamp(world3[i][j], 0, 1)
-			pixels[(i*height+j)*3+2] = uint8(255 * world3[i][j])
-
-		}
-	}
-
-	return pixels, world1, world2, world3
+	return pixels, newWorld1, newWorld2, newWorld3
 }
