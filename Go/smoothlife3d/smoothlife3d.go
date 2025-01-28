@@ -1,4 +1,4 @@
-package smoothlife
+package smoothlife3d
 
 import (
 	"math"
@@ -81,19 +81,26 @@ func convolve(world [][]float64, x, y, radius int, noCenter bool) float64 {
 }
 
 // genere des pixels avec une couleur random
-func GenerateRandomPixels(grid_width, grid_height, kernelRadius int, threshold float32) ([]uint8, [][]float64) {
+func GenerateRandomPixels(grid_width, grid_height int, kernelRadius float64, threshold float32) ([]uint8, [][]float64, [][]float64, [][]float64) {
+  ra = kernelRadius
   width = grid_width
 	height = grid_height
-  world := make([][]float64, height)
+  world1 := make([][]float64, height)
+  world2 := make([][]float64, height)
+  world3 := make([][]float64, height)
 	nestedPixels := make([]uint8, height*width*3)
-  for y := range world {
-    world[y] = make([]float64, width)
-		for x := range world[y] {
+  for y := range world1 {
+    world1[y] = make([]float64, width)
+		world2[y] = make([]float64, width)
+		world3[y] = make([]float64, width)
+    for x := range world1[y] {
       if rand.Float32() < threshold {
-        world[y][x] = rand.Float64()
-        for c := 0; c < 3; c++ {
-          nestedPixels[(y*height+x)*3+c] = uint8(255 * world[y][x])
-        }
+        world1[y][x] = rand.Float64()
+        world2[y][x] = rand.Float64()
+        world3[y][x] = rand.Float64()
+        nestedPixels[(y*height+x)*3] = uint8(255 * world1[y][x])
+        nestedPixels[(y*height+x)*3+1] = uint8(255 * world2[y][x])
+        nestedPixels[(y*height+x)*3+2] = uint8(255 * world3[y][x])
       } else {
         for c := 0; c < 3; c++ {
           nestedPixels[(y*height+x)*3+c] = uint8(0)
@@ -102,7 +109,7 @@ func GenerateRandomPixels(grid_width, grid_height, kernelRadius int, threshold f
 		}
 	}
 
-	return nestedPixels, world
+	return nestedPixels, world1, world2, world3
 }
 
 func updateLine(world [][]float64, y int, buffer []float64) {
@@ -113,32 +120,44 @@ func updateLine(world [][]float64, y int, buffer []float64) {
 	}
 }
 
-func UpdateGrid(pixels []uint8, world [][]float64) ([]uint8, [][]float64) {
-	newWorld := make([][]float64, height)
+func UpdateGrid(pixels []uint8, world1, world2, world3 [][]float64) ([]uint8, [][]float64, [][]float64, [][]float64) {
+	newWorld1 := make([][]float64, height)
+	newWorld2 := make([][]float64, height)
+	newWorld3 := make([][]float64, height)
 	var wg sync.WaitGroup
 
 	for i := 0; i < height; i++ {
 		wg.Add(1)
 		go func(y int) {
 			defer wg.Done()
-			buffer := make([]float64, width)
-			updateLine(world, y, buffer)
-			newWorld[y] = buffer
+			buffer1 := make([]float64, width)
+			updateLine(world1, y, buffer1)
+			newWorld1[y] = buffer1
+      buffer2 := make([]float64, width)
+			updateLine(world2, y, buffer2)
+			newWorld2[y] = buffer2
+      buffer3 := make([]float64, width)
+			updateLine(world3, y, buffer3)
+			newWorld3[y] = buffer3
 		}(i)
 	}
 
 	wg.Wait()
 
-	for i := range world {
-		for j := range world[i] {
-			world[i][j] += dt * newWorld[i][j]
-			world[i][j] = clamp(world[i][j], 0, 1)
-			val := uint8(255 * world[i][j])
-			for c := 0; c < 3; c++ {
-				pixels[(i*height+j)*3+c] = val
-			}
+	for i := range world1 {
+		for j := range world1[i] {
+			world1[i][j] += dt * newWorld1[i][j]
+			world1[i][j] = clamp(world1[i][j], 0, 1)
+			pixels[(i*height+j)*3] = uint8(255 * world1[i][j])
+      world2[i][j] += dt * newWorld2[i][j]
+			world2[i][j] = clamp(world2[i][j], 0, 1)
+			pixels[(i*height+j)*3+1] = uint8(255 * world2[i][j])
+      world3[i][j] += dt * newWorld3[i][j]
+			world3[i][j] = clamp(world3[i][j], 0, 1)
+			pixels[(i*height+j)*3+2] = uint8(255 * world3[i][j])
+
 		}
 	}
 
-	return pixels, world
+	return pixels, world1, world2, world3
 }
