@@ -115,7 +115,7 @@ func GenerateRandomPixels(grid_width, grid_height int, kernelRadius float64, thr
 		world2[y] = make([]float64, width)
 		world3[y] = make([]float64, width)
     for x := range world1[y] {
-      if rand.Float32() < threshold {
+      if rand.Float32() < threshold && (width/3 < x) && (x < 2*width/3) && (height/3 < y ) && (y < 2*height/3){
         world1[y][x] = rand.Float64()
         world2[y][x] = rand.Float64()
         world3[y][x] = rand.Float64()

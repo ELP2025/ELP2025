@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	width  = 800
-	height = 800
+	width  = 200
+	height = 200
 
-	threshold = 0.80
+	threshold = 0.56
 )
 
 func main() {
