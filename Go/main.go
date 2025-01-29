@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	width  = 200
-	height = 200
+	width  = 800
+	height = 800
 
 	threshold = 0.56
 )
