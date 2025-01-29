@@ -7,15 +7,12 @@ import (
   "runtime"
   "github.com/mjibson/go-dsp/fft"
 
-  "fmt"
-  "time"
 )
 
 var (
-  width = 1000
-  height = 1000
+  width = 1024
+  height = 1024
 
-  ra    float64 = 11
 	alpha float64 = 0.028
 	dt    float64 = 0.05
 
@@ -57,24 +54,20 @@ func s(n, m, b1, b2, d1, d2 float64) float64 {
 }
 
 func fftConvolve(worldFFT , kernelFFT []complex128) []float64 {
-
 	resultFFT := make([]complex128, height*width)
-	for i := 0; i < height; i++ {
+	for i := 0; i < height*width; i++ {
 			resultFFT[i] = worldFFT[i] * kernelFFT[i]
 	}
-	
 
 	result := fft.IFFT(resultFFT)
 	return complexToReal(result)
 }
 
 func complexToReal(input []complex128) []float64 {
-  t := time.Now()
 	output := make([]float64, height*width)
 	for i := 0; i < height*width; i++ {
 			output[i] = real(input[i])
 	}
-  fmt.Println("ComplexToReal took : ", time.Since(t))
 	return output
 }
 
@@ -107,8 +100,6 @@ func generateKernelFFT(radius float64) []complex128 {
 
 // genere des pixels avec une couleur random
 func GenerateRandomPixels(grid_width, grid_height int, kernelRadius float64, threshold float32) []uint8 {
-  fft.SetWorkerPoolSize(0)
-  ra = kernelRadius
   width = grid_width
 	height = grid_height
 
@@ -136,37 +127,30 @@ func GenerateRandomPixels(grid_width, grid_height int, kernelRadius float64, thr
       }
 		}
 	}
-  bigKernelFFT = generateKernelFFT(ra)
-  smallKernelFFT = generateKernelFFT(ra/3)
+  bigKernelFFT = generateKernelFFT(kernelRadius)
+  smallKernelFFT = generateKernelFFT(kernelRadius/3)
 	return nestedPixels
 }
 
 func UpdateGrid(pixels []uint8) []uint8 {
 	var wg sync.WaitGroup
 
-  t := time.Now()
-  newWorld1 := world1
-  newWorld2 := world2 
-  newWorld3 := world3
-  fmt.Println("Copying worlds took : ", time.Since(t))
-  t = time.Now()
+
+  newWorld1 := make([]float64, len(world1))
+  newWorld2 := make([]float64, len(world1))
+  newWorld3 := make([]float64, len(world1))
 
   worldFFT1 := fft.FFTReal(world1)
   worldFFT2 := fft.FFTReal(world2)
   worldFFT3 := fft.FFTReal(world3)
-  fmt.Println("Computing FFT took : ", time.Since(t))
-  t= time.Now()
 
   outer1 := outerKernel(worldFFT1) 
   outer2 := outerKernel(worldFFT2)
   outer3 := outerKernel(worldFFT3)
-  fmt.Println("Outer kernels took : ", time.Since(t))
-  t = time.Now()
 
   inner1 := innerKernel(worldFFT1)
   inner2 := innerKernel(worldFFT2)
   inner3 := innerKernel(worldFFT3)
-  fmt.Println("Inner Kernels took : ", time.Since(t))
 
   thread := runtime.NumCPU()*2
   linesPerThread := height/thread
@@ -195,13 +179,14 @@ func UpdateGrid(pixels []uint8) []uint8 {
     }
   }
 
-  world1 = newWorld1
-  world2 = newWorld2
-  world3 = newWorld3
 		}(startLine, endLine)
 	}
 
 	wg.Wait()
+
+  world1 = newWorld1
+  world2 = newWorld2
+  world3 = newWorld3
 
 	return pixels
 }

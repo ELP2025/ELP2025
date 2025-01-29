@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	width  = 800
-	height = 800
+	width  = 1024
+	height = 1024
 
-	threshold = 0.56
+	threshold = 1.00
 )
 
 func main() {
