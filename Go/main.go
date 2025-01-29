@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	width  = 200
-	height = 200
+	width  = 800
+	height = 800
 
 	threshold = 0.56
 )
@@ -27,7 +27,7 @@ func main() {
 	defer glfw.Terminate() //Making sure we kill our window properly
 
 	//nestedPixels := game_of_life.GenerateRandomPixels(width, height,threshold)
-	pixels, world1, world2, world3 := smoothlife3d.GenerateRandomPixels(width, height, 11, threshold)
+	pixels:= smoothlife3d.GenerateRandomPixels(width, height, 11, threshold)
 
 	for !window.ShouldClose() {
     t := time.Now()
@@ -35,7 +35,7 @@ func main() {
 		opengl_utils.UpdateTexture(pixels)
 		// Dynamically update pixel data (optional)
 		//nestedPixels = game_of_life.UpdateGrid(nestedPixels)
-		pixels, world1, world2, world3 = smoothlife3d.UpdateGrid(pixels, world1, world2, world3)
+		pixels = smoothlife3d.UpdateGrid(pixels)
 
     fmt.Println("Last frame took ", time.Since(t), "to render. Running at ", 1.0 / time.Since(t).Seconds(), "fps")
 		//time.Sleep(time.Second/time.Duration(fps) - time.Since(t))

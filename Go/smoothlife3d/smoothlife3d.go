@@ -5,6 +5,7 @@ import (
 	"math/rand"
   "sync"
   "runtime"
+  "github.com/mjibson/go-dsp/fft"
 )
 
 var (
@@ -20,14 +21,11 @@ var (
 	d1 float64 = 0.267
 	d2 float64 = 0.445
 
-  raWheights []float64
-  rbWheights []float64
-)
+  world1, world2, world3 [][]float64
 
-func modulo(a, b int) int {
-  // Used to wrap values arround the grid
-  return (a%b + b) % b
-}
+  bigKernelFFT [][]complex128
+  smallKernelFFT [][]complex128
+)
 
 func clamp(x, min, max float64) float64 {
   // Make sure our values are not out of bound
@@ -55,70 +53,81 @@ func s(n, m, b1, b2, d1, d2 float64) float64 {
 	return sigma2(n, sigmam(b1, d1, m), sigmam(b2, d2, m))
 }
 
-func innerKernel(world [][]float64, x, y, radius int) float64{
-  return convolve(world, x, y, radius, rbWheights,true)
-}
+func fftConvolve(worldFFT , kernelFFT [][]complex128) [][]float64 {
 
-func outerKernel(world [][]float64, x, y, radius int) float64 {
-  return convolve(world, x, y, radius, raWheights, false)
-}
-
-func precomputeWeights(radius float64) []float64 {
-	size := int((2*radius + 1) * (2*radius + 1))
-	weights := make([]float64, size)
-
-	index := 0
-	for dy := -radius; dy <= radius; dy++ {
-		for dx := -radius; dx <= radius; dx++ {
-			dist := math.Sqrt(float64(dx*dx + dy*dy))
-			weights[index] = math.Exp(-0.5 * math.Pow(dist/float64(radius), 2))
-			index++
+	resultFFT := make([][]complex128, height)
+	for y := 0; y < height; y++ {
+		resultFFT[y] = make([]complex128, width)
+		for x := 0; x < width; x++ {
+			resultFFT[y][x] = worldFFT[y][x] * kernelFFT[y][x]
 		}
 	}
 
-	return weights
+	result := fft.IFFT2(resultFFT)
+	return complexToReal(result)
 }
 
-func convolve(world [][]float64, x, y, radius int, wheights []float64, noCenter bool) float64 {
-	sum := 0.0
-  total := 0.0
-  index := 0
+func complexToReal(input [][]complex128) [][]float64 {
+	output := make([][]float64, height)
+	for y := 0; y < height; y++ {
+		output[y] = make([]float64, width)
+		for x := 0; x < width; x++ {
+			output[y][x] = real(input[y][x])
+		}
+	}
+	return output
+}
 
-  for i := y - radius; i <= y + radius; i++ {
-    for j:= x - radius; j <= x + radius; j++ {
-      if (noCenter && y == i && x == j) {continue}
-      
-      sum += wheights[index] * world[modulo(i, width)][modulo(j, height)]
-      total += wheights[index]
-      
-      index ++
-    }
-  }
-  
-  if total != 0 {
-    return (sum / total)
-  }
-  return 0.0
+func innerKernel(worldFFT [][]complex128) [][]float64 {
+	return fftConvolve(worldFFT, smallKernelFFT)
+}
+
+func outerKernel(worldFFT [][]complex128) [][]float64 {
+	return fftConvolve(worldFFT, bigKernelFFT)
+}
+
+func generateKernelFFT(radius float64) [][]complex128 {
+	kernel := make([][]float64, height)
+	centerX, centerY := width/2, height/2
+
+	for y := 0; y < height; y++ {
+		kernel[y] = make([]float64, width)
+		for x := 0; x < width; x++ {
+			dist := math.Sqrt(float64((x-centerX)*(x-centerX) + (y-centerY)*(y-centerY)))
+			if dist <= radius {
+				kernel[y][x] = math.Exp(-0.5 * (dist * dist) / (radius * radius))
+			} else {
+				kernel[y][x] = 0.0
+			}
+		}
+	}
+
+  kernelFFT := fft.FFT2Real(kernel)
+	return kernelFFT
 }
 
 // genere des pixels avec une couleur random
-func GenerateRandomPixels(grid_width, grid_height int, kernelRadius float64, threshold float32) ([]uint8, [][]float64, [][]float64, [][]float64) {
+func GenerateRandomPixels(grid_width, grid_height int, kernelRadius float64, threshold float32) []uint8 {
   ra = kernelRadius
   width = grid_width
 	height = grid_height
-  world1 := make([][]float64, height)
-  world2 := make([][]float64, height)
-  world3 := make([][]float64, height)
+
+  world1 = make([][]float64, height)
+  world2 = make([][]float64, height)
+  world3 = make([][]float64, height)
 	nestedPixels := make([]uint8, height*width*3)
+
   for y := range world1 {
     world1[y] = make([]float64, width)
 		world2[y] = make([]float64, width)
 		world3[y] = make([]float64, width)
+
     for x := range world1[y] {
-      if rand.Float32() < threshold && (width/3 < x) && (x < 2*width/3) && (height/3 < y ) && (y < 2*height/3){
+      if rand.Float32() < threshold {
         world1[y][x] = rand.Float64()
         world2[y][x] = rand.Float64()
         world3[y][x] = rand.Float64()
+
         nestedPixels[(y*height+x)*3] = uint8(255 * world1[y][x])
         nestedPixels[(y*height+x)*3+1] = uint8(255 * world2[y][x])
         nestedPixels[(y*height+x)*3+2] = uint8(255 * world3[y][x])
@@ -129,39 +138,29 @@ func GenerateRandomPixels(grid_width, grid_height int, kernelRadius float64, thr
       }
 		}
 	}
-  raWheights = precomputeWeights(ra)
-  rbWheights = precomputeWeights(ra/3)
-	return nestedPixels, world1, world2, world3
+  bigKernelFFT = generateKernelFFT(ra)
+  smallKernelFFT = generateKernelFFT(ra/3)
+	return nestedPixels
 }
 
-func updateLine(world1, world2, world3 [][]float64, pixels []uint8, newWorld1, newWorld2, newWorld3 [][]float64, startLine, endLine int) {
-  for y:= startLine; y<endLine; y++ {
-    for x:=0; x < width; x++ {	
-      outer := outerKernel(world1, x, y, int(ra-1))
-		  inner := innerKernel(world1, x, y, int(ra-1)/3)
-		  newWorld1[y][x] = clamp(world1[y][x] + dt*(2*s(outer, inner, b1, b2, d1, d2) - 1), 0, 1)
-    
-      outer = outerKernel(world2, x, y, int(ra-1))
-		  inner = innerKernel(world2, x, y, int(ra-1)/3)
-		  newWorld2[y][x] = clamp(world2[y][x] + dt*(2*s(outer, inner, b1, b2, d1, d2) - 1), 0, 1)
-		
-      outer = outerKernel(world3, x, y, int(ra-1))
-		  inner = innerKernel(world3, x, y, int(ra-1)/3)
-		  newWorld3[y][x] = clamp(world3[y][x] + dt*(2*s(outer, inner, b1, b2, d1, d2) - 1),0, 1)
-  
-      pixels[(y*height+x)*3] = uint8(255 * world1[y][x])
-      pixels[(y*height+x)*3+1] = uint8(255 * world2[y][x])
-      pixels[(y*height+x)*3+2] = uint8(255 * world3[y][x])
-    }
-  }
-}
-
-func UpdateGrid(pixels []uint8, world1, world2, world3 [][]float64) ([]uint8, [][]float64, [][]float64, [][]float64) {
+func UpdateGrid(pixels []uint8) []uint8 {
 	var wg sync.WaitGroup
 
   newWorld1 := world1
   newWorld2 := world2 
   newWorld3 := world3
+
+  worldFFT1 := fft.FFT2Real(world1)
+  worldFFT2 := fft.FFT2Real(world2)
+  worldFFT3 := fft.FFT2Real(world3)
+
+  outer1 := outerKernel(worldFFT1) 
+  outer2 := outerKernel(worldFFT2)
+  outer3 := outerKernel(worldFFT3)
+
+  inner1 := innerKernel(worldFFT1)
+  inner2 := innerKernel(worldFFT2)
+  inner3 := innerKernel(worldFFT3)
 
   thread := runtime.NumCPU()*2
   linesPerThread := height/thread
@@ -177,11 +176,25 @@ func UpdateGrid(pixels []uint8, world1, world2, world3 [][]float64) ([]uint8, []
     wg.Add(1)
 		go func(startLine, endLine int) {
 			defer wg.Done()
-      updateLine(world1, world2, world3, pixels, newWorld1, newWorld2, newWorld3, startLine, endLine)
+        for y:= startLine; y<endLine; y++ {
+          for x:=0; x < width; x++ {	
+		        newWorld1[y][x] = clamp(world1[y][x] + dt*(2*s(outer1[y][x], inner1[y][x], b1, b2, d1, d2) - 1), 0, 1)
+		        newWorld2[y][x] = clamp(world2[y][x] + dt*(2*s(outer2[y][x], inner2[y][x], b1, b2, d1, d2) - 1), 0, 1)
+		        newWorld3[y][x] = clamp(world3[y][x] + dt*(2*s(outer3[y][x], inner3[y][x], b1, b2, d1, d2) - 1),0, 1)
+  
+            pixels[(y*height+x)*3] = uint8(255 * newWorld1[y][x])
+            pixels[(y*height+x)*3+1] = uint8(255 * newWorld2[y][x])
+            pixels[(y*height+x)*3+2] = uint8(255 * newWorld3[y][x])
+    }
+  }
+
+  world1 = newWorld1
+  world2 = newWorld2
+  world3 = newWorld3
 		}(startLine, endLine)
 	}
 
 	wg.Wait()
 
-	return pixels, newWorld1, newWorld2, newWorld3
+	return pixels
 }
