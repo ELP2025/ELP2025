@@ -4,10 +4,7 @@ import (
 	"runtime"
 	"time"
   "fmt"
-
 	"main/opengl_utils"
-	//"main/game_of_life"
-	//"main/smoothlife"
   "main/smoothlife3d"
 
 	"github.com/go-gl/glfw/v3.2/glfw"
@@ -26,18 +23,14 @@ func main() {
 	window := opengl_utils.InitWindow(width, height)
 	defer glfw.Terminate() //Making sure we kill our window properly
 
-	//nestedPixels := game_of_life.GenerateRandomPixels(width, height,threshold)
 	pixels:= smoothlife3d.GenerateRandomPixels(width, height, 11, threshold)
 
 	for !window.ShouldClose() {
     t := time.Now()
 
 		opengl_utils.UpdateTexture(pixels)
-		// Dynamically update pixel data (optional)
-		//nestedPixels = game_of_life.UpdateGrid(nestedPixels)
 		pixels = smoothlife3d.UpdateGrid(pixels)
 
     fmt.Println("Last frame took ", time.Since(t), "to render. Running at ", 1.0 / time.Since(t).Seconds(), "fps")
-		//time.Sleep(time.Second/time.Duration(fps) - time.Since(t))
 	}
 }
