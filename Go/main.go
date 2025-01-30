@@ -11,8 +11,9 @@ import (
 )
 
 const (
-	width  = 1024
+	width  = 1024 
 	height = 1024
+  radius = 11
 
 	threshold = 1.00
 )
@@ -23,7 +24,7 @@ func main() {
 	window := opengl_utils.InitWindow(width, height)
 	defer glfw.Terminate() //Making sure we kill our window properly
 
-	pixels:= smoothlife3d.GenerateRandomPixels(width, height, 11, threshold)
+	pixels:= smoothlife3d.GenerateRandomPixels(width, height, radius, threshold)
 
 	for !window.ShouldClose() {
     t := time.Now()
