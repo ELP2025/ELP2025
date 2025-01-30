@@ -5,7 +5,7 @@ import (
 	"math/rand"
   "sync"
   "runtime"
-  "github.com/mjibson/go-dsp/fft"
+  "main/fft" 
   "time"
   "fmt"
 )
@@ -23,9 +23,19 @@ var (
 	d2 float64 = 0.445
 
   world1, world2, world3 []float64
+  worldFFT1, worldFFT2, worldFFT3 []complex128
 
   bigKernelFFT []complex128
   smallKernelFFT []complex128
+
+  kernelFunctions = []func() []float64{
+    func() []float64 {return outerKernel(worldFFT1)},
+    func() []float64 {return innerKernel(worldFFT1)},
+    func() []float64 {return outerKernel(worldFFT2)},
+    func() []float64 {return innerKernel(worldFFT2)},
+    func() []float64 {return outerKernel(worldFFT3)},
+    func() []float64 {return innerKernel(worldFFT3)},
+  }
 )
 
 func clamp(x, min, max float64) float64 {
@@ -54,30 +64,38 @@ func s(n, m, b1, b2, d1, d2 float64) float64 {
 	return sigma2(n, sigmam(b1, d1, m), sigmam(b2, d2, m))
 }
 
-func fftConvolve(worldFFT , kernelFFT []complex128) []float64 {
-	resultFFT := make([]complex128, height*width)
-	for i := 0; i < height*width; i++ {
-			resultFFT[i] = worldFFT[i] * kernelFFT[i]
-	}
+func fftConvolve(worldFFT , kernelFFT []complex128, threads int) []float64 {
+  var wg sync.WaitGroup
+  size := len(worldFFT)
+  resultFFT := make([]complex128, size)
 
-	result := complexToReal(fft.IFFT(resultFFT))
+  indexPerThread := size/threads
+  for t := 0; t < threads; t++ {
+    wg.Add(1)
+    start := t*indexPerThread
+    end := (t+1)*indexPerThread
+    if (t==threads-1) {end = size}
+
+    go func(start, end int) {
+      defer wg.Done()
+      for i := 0; i < size; i++ {
+		    resultFFT[i] = worldFFT[i] * kernelFFT[i]
+	    }
+    }(start, end)
+  }
+
+  wg.Wait()
+
+	result := (fft.IFFT(resultFFT, height*width))
 	return result
 }
 
-func complexToReal(input []complex128) []float64 {
-	output := make([]float64, height*width)
-	for i := 0; i < height*width; i++ {
-			output[i] = real(input[i])
-	}
-	return output
-}
-
 func innerKernel(worldFFT []complex128) []float64 {
-	return fftConvolve(worldFFT, smallKernelFFT)
+	return fftConvolve(worldFFT, smallKernelFFT, 2)
 }
 
 func outerKernel(worldFFT []complex128) []float64 {
-	return fftConvolve(worldFFT, bigKernelFFT)
+	return fftConvolve(worldFFT, bigKernelFFT, 2)
 }
 
 func generateKernelFFT(radius float64, skipCenter bool) []complex128 {
@@ -97,9 +115,7 @@ func generateKernelFFT(radius float64, skipCenter bool) []complex128 {
 		}  
 	}
 
-  if skipCenter {
-    kernel[int(1/2 * width*(1+height))] = 0.0
-  }
+  if skipCenter {kernel[int(1/2 * width*(1+height))] = 0.0}
 
   if sum != 0 {
       for i := range kernel {
@@ -107,7 +123,7 @@ func generateKernelFFT(radius float64, skipCenter bool) []complex128 {
       }
     }
 
-  kernelFFT := fft.FFTReal(kernel)
+  kernelFFT := fft.FFT(kernel)
 	return kernelFFT
 }
 
@@ -153,23 +169,25 @@ func UpdateGrid(pixels []uint8) []uint8 {
   newWorld2 := make([]float64, len(world1))
   newWorld3 := make([]float64, len(world1))
 
-  worldFFT1 := fft.FFTReal(world1)
-  worldFFT2 := fft.FFTReal(world2)
-  worldFFT3 := fft.FFTReal(world3)
+  worldFFT1 = fft.FFT(world1)
+  worldFFT2 = fft.FFT(world2)
+  worldFFT3 = fft.FFT(world3)
   fmt.Println("Precomputation took ", time.Since(t))
 
   t = time.Now()
-  outer1 := outerKernel(worldFFT1) 
-  outer2 := outerKernel(worldFFT2)
-  outer3 := outerKernel(worldFFT3)
-  fmt.Println("Outer Kernel took ", time.Since(t))
+  convolutions := make([][]float64, 6)
 
-  t = time.Now()
-  inner1 := innerKernel(worldFFT1)
-  inner2 := innerKernel(worldFFT2)
-  inner3 := innerKernel(worldFFT3)
-  fmt.Println("Inner Kernel took : ", time.Since(t))
+  for i, fun := range kernelFunctions {
+    wg.Add(1)
+    go func(index int, fun func() []float64) {
+      defer wg.Done()
+      convolutions[index] = fun()
+    }(i, fun)
+  }
 
+  wg.Wait()
+  fmt.Println("Convolutions took ", time.Since(t))
+ 
   thread := runtime.NumCPU()*2
   linesPerThread := height/thread
 
@@ -188,9 +206,9 @@ func UpdateGrid(pixels []uint8) []uint8 {
         for y:= startLine; y<endLine; y++ {
           for x:=0; x < width; x++ {
             index := y*height+x
-		        newWorld1[index] = clamp(world1[index] + dt*(2*s(outer1[index], inner1[index], b1, b2, d1, d2) - 1), 0, 1)
-		        newWorld2[index] = clamp(world2[index] + dt*(2*s(outer2[index], inner2[index], b1, b2, d1, d2) - 1), 0, 1)
-		        newWorld3[index] = clamp(world3[index] + dt*(2*s(outer3[index], inner3[index], b1, b2, d1, d2) - 1),0, 1)
+		        newWorld1[index] = clamp(world1[index] + dt*(2*s(convolutions[0][index], convolutions[1][index], b1, b2, d1, d2) - 1), 0, 1)
+		        newWorld2[index] = clamp(world2[index] + dt*(2*s(convolutions[2][index], convolutions[3][index], b1, b2, d1, d2) - 1), 0, 1)
+		        newWorld3[index] = clamp(world3[index] + dt*(2*s(convolutions[4][index], convolutions[5][index], b1, b2, d1, d2) - 1),0, 1)
   
             pixels[index*3] = uint8(255 * newWorld1[index])
             pixels[index*3+1] = uint8(255 * newWorld2[index])
