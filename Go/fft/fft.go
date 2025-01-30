@@ -1,8 +1,8 @@
 package fft
 
 /*
-#cgo LDFLAGS: -lfftw3
-#include <fftw3-mpi.h>
+#cgo LDFLAGS: -lfftw3 -lfftw3_threads
+#include <fftw3.h>
 #include <stdlib.h>
 */
 import "C"
@@ -33,6 +33,7 @@ func FFT(input []float64) []complex128 {
 	}
 
 	// Create FFTW plan for real-to-complex FFT
+  C.fftw_plan_with_nthreads(C.int(12))
 	plan := C.fftw_plan_dft_r2c_1d(C.int(n), in, out, C.FFTW_ESTIMATE)
 	defer C.fftw_destroy_plan(plan)
 
