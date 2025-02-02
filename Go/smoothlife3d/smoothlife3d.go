@@ -15,7 +15,7 @@ var (
   height = 1024
 
 	alpha float64 = 0.028
-	dt    float64 = 0.05
+	dt    float64 = 0.15
 
 	b1 float64 = 0.278
 	b2 float64 = 0.365
@@ -158,6 +158,38 @@ func GenerateRandomPixels(grid_width, grid_height int, kernelRadius float64, thr
 	}
   bigKernelFFT = generateKernelFFT(kernelRadius, false)
   smallKernelFFT = generateKernelFFT(kernelRadius/3, true)
+	return nestedPixels
+}
+
+// LoadImagePixels initializes the simulation grid from an image’s pixel data.
+// It assumes that pixels is a slice with length = gridWidth*gridHeight*3 (R,G,B),
+// and that gridWidth and gridHeight are powers of two.
+func LoadImagePixels(pixels []uint8, gridWidth, gridHeight int, kernelRadius float64) []uint8 {
+	width = gridWidth
+	height = gridHeight
+
+	// Initialize the simulation world arrays.
+	world1 = make([]float64, gridWidth*gridHeight)
+	world2 = make([]float64, gridWidth*gridHeight)
+	world3 = make([]float64, gridWidth*gridHeight)
+	nestedPixels := make([]uint8, gridWidth*gridHeight*3)
+
+	for y := 0; y < gridHeight; y++ {
+		for x := 0; x < gridWidth; x++ {
+			index := y*gridWidth + x
+			// Copy the image pixel and normalize to [0,1] for the simulation state.
+			nestedPixels[index*3] = pixels[index*3]
+			nestedPixels[index*3+1] = pixels[index*3+1]
+			nestedPixels[index*3+2] = pixels[index*3+2]
+			world1[index] = float64(pixels[index*3]) / 255.0
+			world2[index] = float64(pixels[index*3+1]) / 255.0
+			world3[index] = float64(pixels[index*3+2]) / 255.0
+		}
+	}
+
+	// Initialize the kernel FFTs as in the random generator.
+	bigKernelFFT = generateKernelFFT(kernelRadius, false)
+	smallKernelFFT = generateKernelFFT(kernelRadius/3, true)
 	return nestedPixels
 }
 
