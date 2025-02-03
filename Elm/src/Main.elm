@@ -1,141 +1,43 @@
 module Main exposing (..)
 
--- Press a button to send a GET request for random quotes.
---
--- Read how it works:
---   https://guide.elm-lang.org/effects/json.html
---
-
 import Browser
-import Html exposing (..)
-import Html.Attributes exposing (style)
-import Html.Events exposing (..)
-import Http
-
-import Json.Decode exposing (Decoder, map4, field, int, string)
-
-
+import Svg exposing (..)
+import Svg.Attributes exposing (..)
+import Html exposing (Html, button, div, input, text)
+import Html.Events exposing (onClick, onInput)
+import Html.Attributes as HtmlA exposing (placeholder, value)
 
 -- MAIN
-
-
-main =
-  Browser.element
-    { init = init
-    , update = update
-    , subscriptions = subscriptions
-    , view = view
-    }
-
-
+main = Browser.sandbox { init = initialModel, update = update, view = view }
 
 -- MODEL
+type alias Model = { userInput : String}
 
+initialModel : Model
+initialModel = { userInput = "" }
 
-type Model
-  = Failure
-  | Loading
-  | Success Quote
-
-
-type alias Quote =
-  { quote : String
-  , source : String
-  , author : String
-  , year : Int
-  }
-
-
-init : () -> (Model, Cmd Msg)
-init _ =
-  (Loading, getRandomQuote)
-
-
+-- MESSAGE (Msg)
+type Msg = UpdateInput String | Draw
 
 -- UPDATE
-
-
-type Msg
-  = MorePlease
-  | GotQuote (Result Http.Error Quote)
-
-
-update : Msg -> Model -> (Model, Cmd Msg)
+update : Msg -> Model -> Model
 update msg model =
-  case msg of
-    MorePlease ->
-      (Loading, getRandomQuote)
-
-    GotQuote result ->
-      case result of
-        Ok quote ->
-          (Success quote, Cmd.none)
-
-        Err _ ->
-          (Failure, Cmd.none)
-
-
-
--- SUBSCRIPTIONS
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-  Sub.none
-
-
+    case msg of
+        UpdateInput newText -> { model | userInput = newText }
+        Draw -> model
 
 -- VIEW
-
-
 view : Model -> Html Msg
 view model =
-  div []
-    [ h2 [] [ text "Type in your code below:" ]
-    , viewQuote model
-    ]
-
-
-viewQuote : Model -> Html Msg
-viewQuote model =
-  case model of
-    Failure ->
-      div []
-        [ text "I could not load a random quote for some reason. "
-        , button [ onClick MorePlease ] [ text "Try Again!" ]
-        ]
-
-    Loading ->
-      text "Loading..."
-
-    Success quote ->
-      div []
-        [ button [ onClick MorePlease, style "display" "block" ] [ text "More Please!" ]
-        , blockquote [] [ text quote.quote ]
-        , p [ style "text-align" "right" ]
-            [ text "— "
-            , cite [] [ text quote.source ]
-            , text (" by " ++ quote.author ++ " (" ++ String.fromInt quote.year ++ ")")
+    div [ HtmlA.style "display" "flex", HtmlA.style "flex-direction" "column", HtmlA.style "align-items" "center", HtmlA.style "margin-top" "20px" ]
+        [ div [ HtmlA.style "padding" "10px", HtmlA.style "width" "100%", HtmlA.style "text-align" "center" ] [ Html.text "Type in your code below" ]
+        , input [ placeholder "Écrivez ici...", value model.userInput, onInput UpdateInput, HtmlA.style "margin" "10px", HtmlA.style "padding" "5px", HtmlA.style "width" "45%" ] []
+        , button [ onClick Draw, HtmlA.style "padding" "10px", HtmlA.style "margin-top" "10px", HtmlA.style "width" "150px" ] [ Html.text "Draw" ]
+        , svg
+            [ width "700", height "700", viewBox "0 0 120 120"
+            , HtmlA.style "margin-top" "10px", HtmlA.style "border" "2px solid black", HtmlA.style "background-color" "white"
             ]
+            [ line [ x1 "10", y1 "10", x2 "100", y2 "10", stroke "black", strokeWidth "2" ] [] 
+            , line [ x1 "30", y1 "20", x2 "200", y2 "20", stroke "black", strokeWidth "2" ] [] ]
+
         ]
-
-
-
--- HTTP
-
-
-getRandomQuote : Cmd Msg
-getRandomQuote =
-  Http.get
-    { url = "https://elm-lang.org/api/random-quotes"
-    , expect = Http.expectJson GotQuote quoteDecoder
-    }
-
-
-quoteDecoder : Decoder Quote
-quoteDecoder =
-  map4 Quote
-    (field "quote" string)
-    (field "source" string)
-    (field "author" string)
-    (field "year" int)
