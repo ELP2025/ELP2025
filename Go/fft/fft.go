@@ -13,6 +13,13 @@ import (
 
 var fftMutex sync.Mutex
 
+// Let's be honest here, this is pure wizardry made with the help of ChatGTP. 
+// This is a wrapper for the fftw (Faster Fourrier Transform in the West) Project. 
+// FFTW is a C project that aims to compute FFT as fast as possible.
+// It was needed to get to the speed we have now (about 5 fps on a 1024*1024 grid)
+// without fft we had 0.17 fps.
+// We could have also computed the FFT on the GPU but it was super hard to implement
+
 // fftRealToComplex computes the FFT of a real-valued input []float64
 func FFT(input []float64) []complex128 {
 	fftMutex.Lock()  // Lock the mutex to ensure thread safety during FFT execution

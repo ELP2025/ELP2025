@@ -58,6 +58,7 @@ var (
 )
 
 func InitWindow(window_width int, window_height int) *glfw.Window {
+  // Init an OpenGL window with specific size
   width = window_width
   height = window_height
   window = initGlfw()
@@ -74,12 +75,14 @@ func InitWindow(window_width int, window_height int) *glfw.Window {
 }
 
 func UpdateTexture(pixels []uint8) {
+  // Edit the texture with pixels as argument
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 	gl.TexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, int32(width), int32(height), gl.RGB, gl.UNSIGNED_BYTE, gl.Ptr(pixels))
   draw(window, program, vao, texture)
 }
 
 func draw(window *glfw.Window, program, vao, texture uint32) {
+  // Draw the texture + shader to the screen
 	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 	gl.UseProgram(program)
 
@@ -96,6 +99,7 @@ func draw(window *glfw.Window, program, vao, texture uint32) {
 }
 
 func initGlfw() *glfw.Window {
+  // create a new GlFW instance to handle OpenGL
 	if err := glfw.Init(); err != nil {
 		panic(err)
 	}
@@ -105,7 +109,7 @@ func initGlfw() *glfw.Window {
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 
-	window, err := glfw.CreateWindow(width, height, "Pixel Renderer", nil, nil)
+	window, err := glfw.CreateWindow(width, height, "smoothlife", nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -115,6 +119,7 @@ func initGlfw() *glfw.Window {
 }
 
 func initOpenGL() uint32 {
+  // Init OpenGL vertexShader, fragmentShader and program
 	if err := gl.Init(); err != nil {
 		panic(err)
 	}
@@ -138,6 +143,7 @@ func initOpenGL() uint32 {
 }
 
 func createTexture() uint32 {
+  // creates a texture that will be on our quadVertices
 	var texture uint32
 	gl.GenTextures(1, &texture)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
@@ -176,6 +182,7 @@ func makeVao(vertices []float32) uint32 {
 }
 
 func compileShader(source string, shaderType uint32) (uint32, error) {
+  // compile the shader defined in the var {} of this program. Just needed to init OpenGL
 	shader := gl.CreateShader(shaderType)
 
 	csources, free := gl.Strs(source)
