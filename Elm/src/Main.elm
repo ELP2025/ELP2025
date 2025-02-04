@@ -3,7 +3,7 @@ module Main exposing (..)
 import Browser
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Html exposing (Html, button, div, input, text)
+import Html exposing (Html, button, div, input)
 import Html.Events exposing (onClick, onInput)
 import Html.Attributes as HtmlA exposing (placeholder, value)
 
@@ -11,20 +11,42 @@ import Html.Attributes as HtmlA exposing (placeholder, value)
 main = Browser.sandbox { init = initialModel, update = update, view = view }
 
 -- MODEL
-type alias Model = { userInput : String}
+type alias Model = { userInput : String
+                    , parsedInput : String
+                    , printext : List String}
 
 initialModel : Model
-initialModel = { userInput = "" }
+initialModel = { userInput = "" 
+                , parsedInput = ""
+                , printext = []}
 
 -- MESSAGE (Msg)
 type Msg = UpdateInput String | Draw
+
+--Commande Tcturtle
+type Command
+    = Forward Int
+    | Left Int
+    | Right Int
+    | Repeat Int (List Command)
+
 
 -- UPDATE
 update : Msg -> Model -> Model
 update msg model =
     case msg of
         UpdateInput newText -> { model | userInput = newText }
-        Draw -> model
+        Draw -> { model | parsedInput = model.userInput, userInput = "", printext = divise(model.parsedInput)}
+
+-- FONCTION DE DÉCOUPAGE DES INSTRUCTIONS
+divise : String -> List String
+divise input =
+    input
+        |> String.replace "[" " [ "
+        |> String.replace "]" " ] "
+        |> String.split " "
+        |> List.filter (\s -> s /= "")
+
 
 -- VIEW
 view : Model -> Html Msg
@@ -39,5 +61,5 @@ view model =
             ]
             [ line [ x1 "10", y1 "10", x2 "100", y2 "10", stroke "black", strokeWidth "2" ] [] 
             , line [ x1 "30", y1 "20", x2 "200", y2 "20", stroke "black", strokeWidth "2" ] [] ]
-
+        , div [ HtmlA.style "color" "red", HtmlA.style "margin-top" "20px" ] [ Html.text (String.join " " model.printext)]
         ]
